@@ -19,12 +19,46 @@ document.addEventListener("DOMContentLoaded", () => {
         activityCard.className = "activity-card";
 
         const spotsLeft = details.max_participants - details.participants.length;
+        
+        // Create participants list
+        let participantsList = '';
+        if (details.participants.length > 0) {
+          const participantsItems = details.participants.map(email => 
+            `<li class="participant-item">
+               <span class="participant-email">${email}</span>
+               <button class="delete-participant-btn" onclick="removeParticipant('${name}', '${email}')" title="Remove participant">
+                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                   <path d="M3 6h18"></path>
+                   <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                   <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                   <line x1="10" y1="11" x2="10" y2="17"></line>
+                   <line x1="14" y1="11" x2="14" y2="17"></line>
+                 </svg>
+               </button>
+             </li>`
+          ).join('');
+          participantsList = `
+            <div class="participants-section">
+              <p><strong>Participants:</strong></p>
+              <ul class="participants-list">
+                ${participantsItems}
+              </ul>
+            </div>
+          `;
+        } else {
+          participantsList = `
+            <div class="participants-section">
+              <p><strong>Participants:</strong> <em>No participants yet</em></p>
+            </div>
+          `;
+        }
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsList}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -62,10 +96,17 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
-      } else {
-        messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
-      }
+      
+      // Refresh activities to show updated participant list
+      const activitiesListElement = document.getElementById("activities-list");
+      const activitySelectElement = document.getElementById("activity");
+      
+      // Show loading state
+      activitiesListElement.innerHTML = "<p>Refreshing...</p>";
+      activitySelectElement.innerHTML = '<option value="">-- Select an activity --</option>';
+      
+      // Fetch updated activities
+      fetchActivities();
 
       messageDiv.classList.remove("hidden");
 
@@ -84,3 +125,50 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize app
   fetchActivities();
 });
+
+// Function to remove participant from activity
+async function removeParticipant(activityName, email) {
+  if (!confirm(`Are you sure you want to remove ${email} from ${activityName}?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/activities/${encodeURIComponent(activityName)}/participants/${encodeURIComponent(email)}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const result = await response.json();
+
+    if (response.ok) {
+      // Show success message
+      const messageDiv = document.getElementById("message");
+      messageDiv.textContent = result.message;
+      messageDiv.className = "success";
+      messageDiv.classList.remove("hidden");
+
+      // Hide message after 3 seconds
+      setTimeout(() => {
+        messageDiv.classList.add("hidden");
+      }, 3000);
+
+      // Refresh activities to show updated participant list
+      const activitiesList = document.getElementById("activities-list");
+      const activitySelect = document.getElementById("activity");
+      
+      // Clear current content
+      activitiesList.innerHTML = "<p>Refreshing...</p>";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+      
+      // Fetch updated activities
+      fetchActivities();
+    } else {
+      alert(result.detail || "Failed to remove participant");
+    }
+  } catch (error) {
+    alert("Failed to remove participant. Please try again.");
+    console.error("Error removing participant:", error);
+  }
+}
